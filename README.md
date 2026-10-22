@@ -1,42 +1,51 @@
-# Automotive Data Quality Assurance
+# Automotive Data Quality Assurance — Week 2
+## Automated Data Validation Pipeline
 
-Python project for collecting, profiling, validating and cleaning public automotive datasets.
-It accompanies the *Data Collection Strategy Report* (Week 1).
+This repository extends the Week 1 automotive data collection strategy with a runnable, rule-based validation pipeline. The default run uses synthetic sample records with deliberate quality issues and works offline.
 
-## What it does
-1. **Ingest**: downloads data from public sources and stores it unchanged in `data/raw/` with a manifest (URL, timestamp, row count, SHA-256 checksum).
-   - NHTSA vPIC API (VIN decoding), using `requests` with retries
-   - FuelEconomy.gov bulk CSV (EPA/DOE), using `pandas`
-   - Optional HTML table scraper (`BeautifulSoup`) that checks `robots.txt` first
-2. **Profile**: column types, null rates and distinct counts.
-3. **Validate**: rule-based checks for completeness, validity, accuracy ranges, uniqueness, consistency and timeliness.
-4. **Report**: CSV quality reports in `reports/` and cleaned data in `data/staged/`.
+## Features
+- Schema and required-column checks
+- Completeness / null-rate checks
+- Numeric type coercion and domain range checks
+- VIN format validation (17 characters; excludes I, O, Q)
+- Duplicate natural-key detection (`make + model + year`)
+- Text consistency checks for make names
+- Profiling report, validation report, run summary
+- Row-level quarantine for failed records
+- Logging to console and `logs/validation_pipeline.log`
+- Immutable-ish raw snapshot retained separately from staged output
 
 ## Setup
-```
+```bash
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Usage
-```
-python automotive_data_collection.py --demo          # offline demo with built-in sample data
-python automotive_data_collection.py --fueleconomy   # download and check FuelEconomy.gov data
-python automotive_data_collection.py --vin 1HGCM82633A004352
-python automotive_data_collection.py --all
+## Run the offline demonstration
+```bash
+python src/validation_pipeline.py
 ```
 
-## Project layout
-```
-automotive_data_collection.py   main script
-requirements.txt
-data/raw/      unchanged downloads + manifest.jsonl
-data/staged/   cleaned data
-reports/       profile and validation CSVs
-logs/          run logs
+## Validate your own CSV
+The CSV should include `make`, `model`, `year`, `comb_mpg`, and `displacement_l`.
+```bash
+python src/validation_pipeline.py --input data/raw/my_vehicles.csv --name my_vehicles
 ```
 
-## Data sources and licences
-Check each publisher's terms of use before reusing data. Sources are listed in the report (NHTSA, EPA/DOE FuelEconomy.gov, UCI, EEA, Open Charge Map, Vahan/data.gov.in, Kaggle).
+## Output folders
+- `data/raw/`: raw input snapshot; never cleaned in place
+- `data/staged/`: accepted and standardised records
+- `data/quarantine/`: rows that need review
+- `reports/`: column profile, rule results, and run summary CSVs
+- `logs/`: execution log
 
-## Author
-Neha
+## Important interpretation notes
+- A failed check is a review flag, not automatically proof that the source value is false.
+- Thresholds in `src/validation_pipeline.py` are examples and should be adapted to each source's schema and domain.
+- The pipeline quarantines rows if any row-level rule fails; dataset-level rule failures are reported separately.
+- This educational pipeline does not prove real-world accuracy by itself. Cross-source reconciliation (for example, comparing vehicle details against NHTSA or FuelEconomy.gov) is a planned next step.
+- Review source licences, API terms, and privacy requirements before collecting or redistributing real data.
